@@ -1,0 +1,3 @@
+Método,Silhouette,Davies-Bouldin,Calinski-Harabasz
+DBSCAN (eps=0.44),-0.0722,0.6592,193.96
+GMM (K=7),0.3357,0.8331,1480.34
