@@ -1,4 +1,4 @@
 Método,Tiempo (s),Var/Métrica,Tipo
-PCA,0.002,67.6% var,Lineal
-t-SNE,3.056,KL=1.131,No lineal
-UMAP,9.025,dist local,No lineal
+PCA,0.003,65.3% var,Lineal
+t-SNE,0.788,KL=0.524,No lineal
+UMAP,2.704,dist local,No lineal

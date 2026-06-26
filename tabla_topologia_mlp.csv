@@ -1,0 +1,5 @@
+Capa,Neuronas,Activación,Regularización
+Entrada,64,—,—
+Oculta 1,128,ReLU,—
+Oculta 2,64,ReLU,—
+Salida,5,Softmax,—

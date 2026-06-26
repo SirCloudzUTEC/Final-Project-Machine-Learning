@@ -1,0 +1,3 @@
+Modelo,F1 (todos),F1 (is_tp=1)
+LogReg,0.3826,0.7295
+XGBoost,0.4417,0.7594

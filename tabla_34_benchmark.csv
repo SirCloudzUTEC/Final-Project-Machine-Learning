@@ -1,0 +1,3 @@
+Modelo,F1-macro,Tiempo entreno,Parámetros
+MLP-Base,0.7547,0.9s,16901
+XGBoost,0.7594,1.5s,300 árboles
