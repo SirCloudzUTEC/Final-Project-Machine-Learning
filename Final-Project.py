@@ -9,7 +9,7 @@ import seaborn as sns
 
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
+from sklearn.manifold import TSNE, trustworthiness
 from sklearn.cluster import DBSCAN
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics import (silhouette_score, davies_bouldin_score,
@@ -87,6 +87,8 @@ fig.tight_layout()
 fig.savefig("fig1_pca_varianza.png", dpi=150)
 plt.close()
 
+# Ambos métodos no lineales se ejecutan sobre el MISMO espacio de entrada
+# (PCA-30, denoising estándar) para que la comparación de tiempos sea justa.
 X_pre = X_pca_full[:, :min(30, X_pca_full.shape[1])]
 
 t0 = time.time()
@@ -96,23 +98,34 @@ X_tsne = tsne.fit_transform(X_pre)
 t_tsne = time.time() - t0
 print(f"[t-SNE] tiempo={t_tsne:.3f}s  |  KL-div={tsne.kl_divergence_:.4f}")
 
+# Warm-up: la primera llamada a UMAP compila el kernel numba (JIT) e infla
+# el tiempo medido. Se descarta un fit previo para cronometrar de forma justa.
+_ = umap.UMAP(n_components=2, n_neighbors=min(15, len(X_pre) - 1),
+              min_dist=0.1, random_state=SEED).fit_transform(X_pre)
 t0 = time.time()
-reducer = umap.UMAP(n_components=2, n_neighbors=min(15, len(X_tp) - 1),
+reducer = umap.UMAP(n_components=2, n_neighbors=min(15, len(X_pre) - 1),
                     min_dist=0.1, random_state=SEED)
-X_umap = reducer.fit_transform(X_tp)
+X_umap = reducer.fit_transform(X_pre)
 t_umap = time.time() - t0
 print(f"[UMAP] tiempo={t_umap:.3f}s")
 
+# Trustworthiness: métrica cuantitativa de preservación de la estructura local
+# (0-1, mayor es mejor). Permite contrastar t-SNE y UMAP con un número, no solo
+# de forma cualitativa. Se calcula sobre el mismo espacio de entrada (X_pre).
+tw_tsne = trustworthiness(X_pre, X_tsne, n_neighbors=15)
+tw_umap = trustworthiness(X_pre, X_umap, n_neighbors=15)
+print(f"[Trustworthiness] t-SNE={tw_tsne:.4f}  UMAP={tw_umap:.4f}")
+
 fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 datasets_2d = [("PCA", X_pca2), ("t-SNE", X_tsne), ("UMAP", X_umap)]
-for ax, (name, X2) in zip(axes, datasets_2d):
+for i, (ax, (name, X2)) in enumerate(zip(axes, datasets_2d)):
     for sp, label in SPECIES_NAMES.items():
         mask = y_tp == sp
         if mask.sum() == 0:
             continue
         ax.scatter(X2[mask, 0], X2[mask, 1],
                    color=PALETTE[sp], label=label, s=55, alpha=0.8, edgecolors="w", lw=0.5)
-    ax.set_title(f"Figura 2{['a','b','c'][datasets_2d.index((name, X2))]}. {name}")
+    ax.set_title(f"Figura 2{['a','b','c'][i]}. {name}")
     ax.set_xlabel("Dim 1")
     ax.set_ylabel("Dim 2")
     ax.legend(loc="best", markerscale=1.2)
@@ -124,7 +137,8 @@ plt.close()
 tabla_32 = pd.DataFrame({
     "Método":      ["PCA", "t-SNE", "UMAP"],
     "Tiempo (s)":  [round(t_pca, 3), round(t_tsne, 3), round(t_umap, 3)],
-    "Var/Métrica": [f"{var_2pc:.1f}% var", f"KL={tsne.kl_divergence_:.3f}", "dist local"],
+    "Var/Métrica": [f"{var_2pc:.1f}% var", f"KL={tsne.kl_divergence_:.3f}", "—"],
+    "Trustworthiness": ["—", round(tw_tsne, 4), round(tw_umap, 4)],
     "Tipo":        ["Lineal", "No lineal", "No lineal"],
 })
 print("\n── Tabla comparativa 3.2 ──")
@@ -241,9 +255,21 @@ tabla_33 = pd.DataFrame([
     metricas(X_cl, labels_db, f"DBSCAN (eps={eps_val:.2f})"),
     metricas(X_cl, labels_gmm, f"GMM (K={best_k})"),
 ])
-print("\n── Tabla de métricas 3.3 ──")
+print("\n── Tabla de métricas 3.3 (espacio UMAP) ──")
 print(tabla_33.to_string(index=False))
 tabla_33.to_csv("tabla_33_metricas.csv", index=False)
+
+# CONTROL METODOLÓGICO: UMAP optimiza la separación local, por lo que medir
+# Silhouette en su propio espacio es parcialmente circular. Se reevalúan las
+# MISMAS etiquetas en el espacio PCA-30 (no optimizado para clustering) como
+# control: si la estructura persiste, no es un artefacto de la proyección UMAP.
+tabla_33_ctrl = pd.DataFrame([
+    metricas(X_pre, labels_db, f"DBSCAN (eps={eps_val:.2f})"),
+    metricas(X_pre, labels_gmm, f"GMM (K={best_k})"),
+])
+print("\n── Tabla de métricas 3.3-control (espacio PCA-30, mismas etiquetas) ──")
+print(tabla_33_ctrl.to_string(index=False))
+tabla_33_ctrl.to_csv("tabla_33_metricas_control_pca.csv", index=False)
 
 ari_db = adjusted_rand_score(y_tp[labels_db != -1], labels_db[labels_db != -1])
 ari_gmm = adjusted_rand_score(y_tp, labels_gmm)
