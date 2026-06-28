@@ -549,3 +549,5 @@ for f in ["fig1_pca_varianza.png", "fig2_proyecciones_2d.png", "fig3_kdist.png",
           "tabla_32_comparativa.csv", "tabla_33_metricas.csv", "tabla_34_benchmark.csv",
           "tabla_topologia_mlp.csv", "tabla_contraste_istp.csv"]:
     print(f"  · {f}")
+
+#asd
